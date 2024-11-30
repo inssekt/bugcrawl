@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 import db  
 import vinted  
+from scrapers.vinted_scraper import VintedScraper
 
 
 load_dotenv()
@@ -18,6 +19,9 @@ bot = commands.Bot(command_prefix='/', intents=intents)
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = 1311344458822058077  
+
+
+vinted_scraper = VintedScraper()
 
 
 @bot.event
@@ -89,7 +93,7 @@ async def periodic_scraping():
 
     for keyword in keywords:
         
-        listings = vinted.fetch_vinted_listings(keyword)
+        listings = vinted_scraper.fetch_listings(keyword)
 
         if listings:
             for listing in listings:
