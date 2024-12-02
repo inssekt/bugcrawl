@@ -45,11 +45,9 @@ class DepopScraper(BaseScraper):
         # firefox_options.set_preference("network.proxy.socks", "127.0.0.1")  
         # firefox_options.set_preference("network.proxy.socks_port", 9050)  
 
-        capabilities = DesiredCapabilities.FIREFOX.copy()
-
         firefox_options.set_preference("general.useragent.override", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
         
-        driver = webdriver.Firefox(options=firefox_options, desired_capabilities=capabilities)
+        driver = webdriver.Firefox(options=firefox_options)
 
         # try:
         #     renew_tor_ip()
