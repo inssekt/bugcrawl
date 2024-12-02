@@ -72,22 +72,16 @@ class DepopScraper(BaseScraper):
         items = driver.find_elements(By.CSS_SELECTOR, "li.styles__ProductCardContainer-sc-ec533c9e-7")
         for item in items:
             try:
-                
                 title_tag = item.find_element(By.CSS_SELECTOR, "a.styles__ProductCard-sc-ec533c9e-4.elBVWz")
                 link = title_tag.get_attribute('href')  
-                print(f"link: {link}")
                 if link.endswith('/'):
                     link = link[:-1]  
                 listing_id = link.split("/")[-1]
-                print(f"Listing ID: {listing_id}")
 
                 if not db.is_listing_seen(listing_id):
                     db.save_listing_to_db(listing_id)
-
                     id_parts = listing_id.split('-')
                     title = " ".join(id_parts[1:])
-
-                    
                     try:
                         image_tag = item.find_element(By.CSS_SELECTOR, "img.sc-htehQK.fmdgqI")
                         srcset = image_tag.get_attribute('srcset')
@@ -95,15 +89,11 @@ class DepopScraper(BaseScraper):
                         image_url = image_urls[-1].split(" ")[0]
                     except Exception:
                         image_url = "https://via.placeholder.com/150"  
-
-                    
                     try:
                         price_element = item.find_element(By.XPATH, '//*[@aria-label="Price"]')
                         price = price_element.text
                     except Exception:
                         price = "Price not available"
-
-                    
                     new_listings.append({
                         "title": title,
                         "link": link,

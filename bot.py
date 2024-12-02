@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import commands, tasks
 import os
 from dotenv import load_dotenv
@@ -29,54 +30,46 @@ scrapers = {
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}')
-    
+    await bot.tree.sync()
+
     db.setup_database()
     periodic_scraping.start()  
+    
 
-
-
-@bot.command(help="Create a new keyword and assign it to a platform.\nUsage: /createkeyword <keyword> <platform>")
-async def createkeyword(ctx, keyword: str, platform: str):
+@bot.tree.command(name="createkeyword", description="Create a new keyword to periodically scrape from a platform")
+async def createkeyword(
+    interaction: discord.Interaction, 
+    keyword: str, 
+    platform: str
+):
     """
     Command to create a new keyword and channel under the respective platform category.
     """
-    if ctx.author.guild_permissions.administrator:
-        guild = ctx.guild
-
-        
+    if interaction.user.guild_permissions.administrator:
+        guild = interaction.guild
         category_name = platform.capitalize()  
         category = discord.utils.get(guild.categories, name=category_name)
-        
-        
+
         if not category:
             category = await guild.create_category(category_name)
-            await ctx.send(f"Category '{category_name}' created.")
+            await interaction.response.send_message(f"Category '{category_name}' created.")
 
-        
         existing_channel = discord.utils.get(guild.text_channels, name=keyword, category=category)
         if existing_channel:
-            await ctx.send(f"The channel for keyword '{keyword}' already exists under the platform '{platform}'!")
+            await interaction.response.send_message(f"The channel for keyword '{keyword}' already exists under the platform '{platform}'!")
         else:
-            
             new_channel = await guild.create_text_channel(keyword, category=category)
-
-            
             db.save_keyword(keyword, platform, new_channel.id)
-
-            await ctx.send(f"Keyword '{keyword}' created under platform '{platform}' with channel '{new_channel.name}'!")
+            await interaction.response.send_message(f"Keyword '{keyword}' created under platform '{platform}' with channel '{new_channel.name}'!")
     else:
-        await ctx.send("You do not have permission to create a keyword. You must be an administrator.")
-
-
+        await interaction.response.send_message("You do not have permission to create a keyword. You must be an administrator.")
 
 @createkeyword.error
-async def createkeyword_error(ctx, error):
-    if isinstance(error, commands.MissingRequiredArgument) and error.param.name == 'keyword':
-        await ctx.send("Error: You need to specify a keyword! Usage: `/createkeyword <keyword>`")
+async def createkeyword_error(interaction: discord.Interaction, error):
+    if isinstance(error, commands.MissingRequiredArgument):
+        await interaction.response.send_message("Error: You need to specify a keyword and platform! Usage: `/createkeyword <keyword> <platform>`")
     else:
-        await ctx.send("An unexpected error occurred while processing your command. Usage: `/createkeyword <keyword>`")
-
-
+        await interaction.response.send_message("An unexpected error occurred while processing your command.")
 
 async def send_to_discord(message_data):
     if 'image_url' not in message_data:
@@ -90,13 +83,8 @@ async def send_to_discord(message_data):
         url=message_data['link'],  
         color=discord.Color.blue()
     )
-    
-    
     embed.set_image(url=message_data['image_url'])
-
-    
     channels = db.get_channels_for_keyword(message_data['keyword'], message_data['platform'])
-
     for channel_id in channels:
         channel = bot.get_channel(channel_id)
         if channel:
@@ -111,32 +99,22 @@ async def send_to_discord(message_data):
 
 @tasks.loop(minutes=1)  
 async def periodic_scraping():
-    
     keywords = db.get_keywords()
-
-    for keyword, platform in keywords:
-        
+    for keyword, platform in keywords:    
         channel_ids = db.get_channels_for_keyword(keyword, platform)
-
         for channel_id in channel_ids:
-            
             channel = bot.get_channel(channel_id)
-
-            
             if not channel:
                 print(f"Channel with ID {channel_id} for keyword '{keyword}' on platform '{platform}' no longer exists.")
                 db.remove_channel_for_keyword(keyword, platform, channel_id)  
                 continue  
-            
-            
             if platform == "vinted":
                 listings = vinted_scraper.fetch_listings(keyword)
             elif platform == "depop":
                 listings = depop_scraper.fetch_listings(keyword)
             else:
                 continue  
-            
-            
+
             if listings:
                 for listing in listings:
                     message_data = {
@@ -148,10 +126,6 @@ async def periodic_scraping():
                         'keyword': keyword,
                         'platform': platform  
                     }
-
-                    
                     await send_to_discord(message_data)
-
-
 
 bot.run(TOKEN)
