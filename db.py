@@ -12,11 +12,12 @@ def setup_database():
         )
     """)
 
-    # Create table for keywords and platforms
+    # Create table for keywords and platforms with a composite UNIQUE constraint on (keyword, platform)
     cursor.execute('''CREATE TABLE IF NOT EXISTS keywords (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        keyword TEXT UNIQUE,
-                        platform TEXT)''')
+                        keyword TEXT,
+                        platform TEXT,
+                        UNIQUE(keyword, platform))''')  # Added composite unique constraint
 
     # Create table for storing keyword-channel relationships
     cursor.execute('''CREATE TABLE IF NOT EXISTS keyword_channels (
@@ -52,7 +53,6 @@ def save_listing_to_db(listing_id):
     conn.close()
 
 
-# Function to save a keyword, its associated platform, and the channel ID
 def save_keyword(keyword, platform, channel_id):
     conn = sqlite3.connect("bugcrawl.db")
     cursor = conn.cursor()
