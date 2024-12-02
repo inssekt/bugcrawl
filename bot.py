@@ -8,7 +8,7 @@ from scrapers.vinted_scraper import VintedScraper
 from scrapers.depop_scraper import DepopScraper
 from scrapers.mercarijp_scraper import MercariJPScraper
 import asyncio
-from datetime import datetime
+import datetime
 
 intents = discord.Intents.default()
 intents.message_content = True 
@@ -99,51 +99,39 @@ async def send_to_discord(message_data):
         print(f"Error: 'image' not found for listing {message_data['title']}")
         message_data['image_url'] = "https://via.placeholder.com/150" 
 
-        # embed = discord.Embed(
-        #     title="New listing!",
-        #     description=f"New listing found. Details are below",
-        #     url=message_data['link'],
-        #     color=discord.Color.blue(),
-        #     timestamp=datetime.now())
-
-        # embed.add_field(name="Title",
-        #                 value=message_data['title'],
-        #                 inline=True)
-        # embed.add_field(name="Price",
-        #                 value=message_data['price'],
-        #                 inline=True)
-        # embed.add_field(name="Brand",
-        #                 value=message_data['brand'],
-        #                 inline=False)
-
-        # embed.set_image(url=message_data['image_url'])
-
-        # embed.set_footer(text="Scraped by bugcrawl",
-        #          icon_url="https://img.freepik.com/premium-vector/ladybug-with-closed-shell-beetle-cartoon-bug-design-flat-vector-illustration-isolated-white-background_257455-3194.jpg")
+    embedColor = discord.Colour.greyple()
+    if message_data['platform'] == "vinted":
+        embedColor = discord.Colour.blurple()
+    elif message_data['platform'] == "depop":
+        embedColor = discord.Colour.dark_red()
+    elif message_data['platform'] == "mercarijp":
+        embedColor = discord.Colour.red()
 
     embed = discord.Embed(
         title="New Listing",
-        description=f"**Price**: {message_data['price']}\n**Brand**: {message_data['brand']}",  
         url=message_data['link'],  
-        color=discord.Color.blue(),
-        # timestamp=f"{dt}"
+        color=embedColor,
+        timestamp=datetime.datetime.now()
+        
     )
 
     embed.add_field(name="Title",
         value=message_data['title'],
-        inline=True)
+        inline=False)
     embed.add_field(name="Price",
         value=message_data['price'],
         inline=True)
     embed.add_field(name="Brand",
         value=message_data['brand'],
-        inline=False)
-    
+        inline=True)
     embed.set_footer(text="Scraped by bugcrawl",
         icon_url="https://img.freepik.com/premium-vector/ladybug-with-closed-shell-beetle-cartoon-bug-design-flat-vector-illustration-isolated-white-background_257455-3194.jpg")
 
-
     embed.set_image(url=message_data['image_url'])
+
+    embed.set_footer(text="Scraped by bugcrawl",
+                 icon_url="https://img.freepik.com/premium-vector/ladybug-with-closed-shell-beetle-cartoon-bug-design-flat-vector-illustration-isolated-white-background_257455-3194.jpg")
+
 
     channels = db.get_channels_for_keyword(message_data['keyword'], message_data['platform'])
     for channel_id in channels:
@@ -157,44 +145,29 @@ async def send_to_discord(message_data):
             db.remove_channel_for_keyword(message_data['keyword'], message_data['platform'], channel_id)
 
 async def scrape():
-    keywords = db.get_keywords()  # Returns list of (keyword, platform) pairs
-
-    # Group keywords by platform
+    keywords = db.get_keywords()  
     platform_keywords = {}
     for keyword, platform in keywords:
         platform_keywords.setdefault(platform, []).append(keyword)
-
-    # Create a task for each platform and run them concurrently
     platform_tasks = []
     for platform, keywords in platform_keywords.items():
-        platform_task = asyncio.create_task(scrape_platform(platform, keywords))  # Start task for platform
+        platform_task = asyncio.create_task(scrape_platform(platform, keywords))  
         platform_tasks.append(platform_task)
-
-    # Wait for all platform scraping tasks to finish (concurrent execution)
     await asyncio.gather(*platform_tasks)
 
 async def scrape_platform(platform, keywords):
-    """
-    Scrape all keywords concurrently for a specific platform.
-    This function will scrape keywords concurrently for the same platform.
-    """
     print(f"Starting to scrape {platform}...")
 
-    # Create a list of tasks to scrape each keyword concurrently for this platform
+    
     tasks = [scrape_keyword(keyword, platform) for keyword in keywords]
 
-    # Run all the keyword scraping tasks concurrently
+    
     await asyncio.gather(*tasks)
 
 async def scrape_keyword(keyword, platform):
-    """
-    Scrape listings for a specific keyword and platform, and send results to Discord channels.
-    """
     print(f"Scraping {platform} for keyword: {keyword}")
 
-    # Get channel IDs associated with the keyword-platform combination
     channel_ids = db.get_channels_for_keyword(keyword, platform)
-    
     for channel_id in channel_ids:
         channel = bot.get_channel(channel_id)
         if not channel:
@@ -202,17 +175,14 @@ async def scrape_keyword(keyword, platform):
             db.remove_channel_for_keyword(keyword, platform, channel_id)
             continue
 
-        # Fetch listings for the platform
         if platform == "vinted":
-            listings = vinted_scraper.fetch_listings(keyword)
+            listings = await vinted_scraper.fetch_listings(keyword)
         elif platform == "depop":
-            listings = depop_scraper.fetch_listings(keyword)
+            listings = await depop_scraper.fetch_listings(keyword)
         elif platform == "mercarijp":
-            listings = mercarijp_scraper.fetch_listings(keyword)
+            listings = await mercarijp_scraper.fetch_listings(keyword)
         else:
-            return  # If platform is unrecognized, exit the function
-
-        # Process and send listings
+            return  
         if listings:
             for listing in listings:
                 message_data = {
